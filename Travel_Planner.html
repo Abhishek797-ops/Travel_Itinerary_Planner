@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoyAIge - AI Travel Itinerary Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- PDF Generation Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        .font-logo {
+            font-family: 'Poppins', sans-serif;
+        }
+        .hero-bg {
+            background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=2070&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+            height: 100vh;
+        }
+        .planner-hero-bg { 
+             background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=2070&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+        }
+        .glassmorphism {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .tab-active {
+            color: #0ea5e9;
+            border-bottom: 2px solid #0ea5e9;
+        }
+        .tab-inactive {
+            color: #64748b;
+            border-bottom: 2px solid transparent;
+        }
+        #itinerary-output {
+            scroll-margin-top: 80px; /* Offset for sticky header */
+        }
+        /* Vertical Timeline */
+        .timeline {
+            position: relative;
+            padding-left: 3rem;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 1.5rem;
+            top: 0.5rem;
+            bottom: 0.5rem;
+            width: 2px;
+            background-color: #e2e8f0; /* slate-200 */
+            transform: translateX(-50%);
+        }
+        .timeline-item {
+            position: relative;
+            margin-bottom: 2rem;
+        }
+        .timeline-item:last-child {
+            margin-bottom: 0;
+        }
+        .timeline-icon {
+            position: absolute;
+            left: -3rem;
+            top: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 3rem;
+            height: 3rem;
+        }
+        .error-message {
+            background-color: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            text-align: center;
+        }
+        /* Page Transition Animations */
+        .fade-out {
+            animation: fadeOut 0.5s ease-out forwards;
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in forwards;
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+    <!-- Home Page Section -->
+    <section id="home-page">
+        <div class="hero-bg flex flex-col">
+            <header class="bg-transparent text-white">
+                <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex items-center justify-between h-20">
+                        <div class="flex items-center gap-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-sky-400"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+                            <div>
+                                <h1 class="text-3xl font-bold font-logo">Voy<span class="text-sky-400">AI</span>ge</h1>
+                                <p class="text-xs text-slate-200 -mt-1 tracking-wider">Intelligent Travel, Simplified.</p>
+                            </div>
+                        </div>
+                    </div>
+                </nav>
+            </header>
+            <div class="flex-grow flex items-center justify-center text-center text-white px-4">
+                <div>
+                    <h1 class="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight">Your Next Adventure Awaits</h1>
+                    <p class="mt-4 max-w-2xl mx-auto text-lg sm:text-xl text-slate-200">Let our AI craft the perfect, personalized travel itinerary just for you. Spend less time planning and more time exploring.</p>
+                    <button id="get-started-btn" class="mt-10 bg-sky-500 hover:bg-sky-600 text-white font-bold py-4 px-8 rounded-lg shadow-lg text-lg transition duration-300 ease-in-out transform hover:scale-105">
+                        Get Started
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Planner Section (Initially Hidden) -->
+    <section id="planner-page" class="hidden">
+        <!-- Header -->
+        <header class="bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-50">
+            <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center gap-3">
+                       <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-sky-500"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+                        <div>
+                            <h1 class="text-2xl font-bold text-sky-600 font-logo">Voy<span class="text-sky-500">AI</span>ge</h1>
+                            <p class="text-xs text-slate-500 -mt-1 tracking-wider">Intelligent Travel, Simplified.</p>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        </header>
+
+        <main>
+            <div class="planner-hero-bg">
+                <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32 text-white text-center">
+                    <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight">Craft Your Perfect Trip with AI</h1>
+                    <p class="mt-4 max-w-2xl mx-auto text-lg sm:text-xl text-slate-200">Just tell us where you're going, your budget, and for how long. We'll handle the rest.</p>
+                    
+                    <form id="trip-form" class="mt-10 max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end p-6 rounded-2xl glassmorphism">
+                        <div class="text-left">
+                            <label for="city" class="block text-sm font-medium text-slate-100">Destination City</label>
+                            <input type="text" id="city" name="city" class="mt-1 block w-full bg-white/20 text-white border-slate-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm placeholder-slate-300" placeholder="e.g., Paris, France" required>
+                        </div>
+                        <div class="text-left">
+                            <label for="budget" class="block text-sm font-medium text-slate-100">Budget (USD)</label>
+                            <input type="number" id="budget" name="budget" class="mt-1 block w-full bg-white/20 text-white border-slate-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm placeholder-slate-300" placeholder="e.g., 2000" required>
+                        </div>
+                        <div class="text-left">
+                            <label for="days" class="block text-sm font-medium text-slate-100">Number of Days</label>
+                            <input type="number" id="days" name="days" class="mt-1 block w-full bg-white/20 text-white border-slate-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-sky-500 focus:border-sky-500 sm:text-sm placeholder-slate-300" placeholder="e.g., 5" required>
+                        </div>
+                        <button type="submit" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-md shadow-lg transition duration-300 ease-in-out transform hover:scale-105 sm:col-span-2 lg:col-span-1">Generate Itinerary</button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="loading" class="hidden text-center py-16">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500"></div>
+                <p class="mt-4 text-lg font-medium text-slate-600">Generating your personalized itinerary...</p>
+            </div>
+
+            <div id="itinerary-output" class="hidden container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                 <!-- Error message container -->
+                <div id="error-message-container" class="hidden mb-8"></div>
+
+                <div class="bg-white p-6 rounded-2xl shadow-lg mb-8">
+                     <div class="text-center">
+                        <h2 class="text-3xl font-bold text-slate-800">Your Trip to <span id="output-city" class="text-sky-600"></span></h2>
+                        <div class="mt-4 flex flex-wrap justify-center items-center gap-x-6 gap-y-2 text-slate-600">
+                            <p class="flex items-center"><i data-lucide="calendar-days" class="w-5 h-5 mr-2 text-sky-500"></i><span id="output-days"></span> Days</p>
+                            <p class="flex items-center"><i data-lucide="wallet" class="w-5 h-5 mr-2 text-sky-500"></i>$<span id="output-budget"></span> Budget</p>
+                        </div>
+                     </div>
+                     <div id="action-buttons" class="mt-6 flex flex-wrap justify-center gap-4 border-t pt-6 border-slate-100"></div>
+                </div>
+
+                <div id="day-tabs" class="flex justify-center gap-6 mb-8 border-b border-slate-200"></div>
+                <div id="itinerary-content"></div>
+            </div>
+        </main>
+
+        <footer class="bg-slate-800 text-white mt-16">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center">
+                <p>&copy; 2025 VoyAIge. All rights reserved.</p>
+                <p class="text-sm text-slate-400 mt-1">Powered by AI, designed for adventure.</p>
+            </div>
+        </footer>
+    </section>
+
+    <script>
+        // --- Page Navigation ---
+        const homePage = document.getElementById('home-page');
+        const plannerPage = document.getElementById('planner-page');
+        const getStartedBtn = document.getElementById('get-started-btn');
+
+        getStartedBtn.addEventListener('click', () => {
+            homePage.classList.add('fade-out');
+            
+            setTimeout(() => {
+                homePage.classList.add('hidden');
+                plannerPage.classList.remove('hidden');
+                plannerPage.classList.add('fade-in');
+                window.scrollTo(0, 0);
+            }, 500); // Match animation duration
+        });
+
+        // --- Planner Logic ---
+        lucide.createIcons();
+        const { jsPDF } = window.jspdf;
+
+        const tripForm = document.getElementById('trip-form');
+        const loadingIndicator = document.getElementById('loading');
+        const itineraryOutput = document.getElementById('itinerary-output');
+        const dayTabsContainer = document.getElementById('day-tabs');
+        const itineraryContentContainer = document.getElementById('itinerary-content');
+        const actionButtonsContainer = document.getElementById('action-buttons');
+        const errorMessageContainer = document.getElementById('error-message-container');
+
+        // --- IMPORTANT: ADD YOUR API KEYS HERE ---
+        const GEMINI_API_KEY = "GEMINI_KEY"; 
+        const GOOGLE_MAPS_API_KEY = "GOOGLE_MAP_KEY"; 
+        // -----------------------------------------
+
+        // Function to get a valid Lucide icon name, or a default
+        function getLucideIcon(iconName) {
+            const validIcons = [
+                'map-pin', 'utensils', 'building-2', 'museum', 'coffee', 'shopping-bag', 
+                'mountain', 'camera', 'bike', 'sailboat', 'star', 'palette', 'book',
+                'plane', 'train', 'car', 'walking', 'bus', 'landmark', 'church', 'tree'
+            ];
+            if (iconName && validIcons.includes(iconName.toLowerCase())) {
+                return iconName.toLowerCase();
+            }
+            return 'map-pin'; // Default icon
+        }
+
+        tripForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const city = document.getElementById('city').value;
+            const budget = document.getElementById('budget').value;
+            const days = parseInt(document.getElementById('days').value);
+
+            if (!city || !budget || !days) {
+                displayError("Please fill in all the required fields.");
+                return;
+            }
+
+
+            itineraryOutput.classList.add('hidden');
+            errorMessageContainer.classList.add('hidden');
+            loadingIndicator.classList.remove('hidden');
+            
+            try {
+                const itinerary = await generateRealItinerary(city, budget, days);
+                if (itinerary && itinerary.dailyPlans && itinerary.dailyPlans.length > 0) {
+                    displayItinerary(itinerary);
+                    itineraryOutput.classList.remove('hidden');
+                    itineraryOutput.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    throw new Error("Failed to parse itinerary from AI response. The response might be empty or in an unexpected format.");
+                }
+            } catch (error) {
+                console.error("Error generating itinerary:", error);
+                displayError(`Sorry, we couldn't generate your itinerary. Please try again. Error: ${error.message}`);
+            } finally {
+                loadingIndicator.classList.add('hidden');
+            }
+        });
+
+        /**
+         * Generates a real itinerary using the Gemini API with a guaranteed JSON response.
+         */
+        async function generateRealItinerary(city, budget, days) {
+            const prompt = `
+            Create a detailed JSON response for a ${days}-day travel itinerary in ${city} with a total budget of $${budget}.
+            The response must strictly follow this schema:
+
+            {
+              "dailyPlans": [
+                {
+                  "day": number,
+                  "title": string,
+                  "summary": string,
+                  "schedule": [
+                    {
+                      "time": string,
+                      "activity": string,
+                      "description": string,
+                      "cost": number,
+                      "icon": string // Lucide icon name, e.g., "map-pin", "museum", "coffee", "shopping-bag"
+                    }
+                  ],
+                  "restaurantRecommendations": [
+                    {
+                      "name": string,
+                      "cuisine": string,
+                      "description": string
+                    }
+                  ]
+                }
+              ]
+            }
+
+            Return ONLY valid JSON, no extra text. Ensure 'cost' for activities is a number.
+            `;
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+            const requestBody = {
+                contents: [{ parts: [{ text: prompt }] }]
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.json();
+                    console.error("API Error Response:", errorBody);
+                    throw new Error(`API call failed: ${response.status} - ${errorBody.error?.message || "Unknown error"}`);
+                }
+
+                const data = await response.json();
+                const itineraryText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (!itineraryText) throw new Error("No text returned from Gemini.");
+
+                let parsedData;
+                try {
+                    parsedData = JSON.parse(itineraryText);
+                } catch (e) {
+                    console.warn("Attempting to clean response and re-parse...");
+                    const cleaned = itineraryText.replace(/```json|```/g, "").trim();
+                    parsedData = JSON.parse(cleaned);
+                }
+
+                // Attach metadata
+                parsedData.city = city;
+                parsedData.budget = budget;
+                parsedData.days = days;
+
+                // Add daily total cost and ensure icons are valid
+                if (parsedData.dailyPlans) {
+                    parsedData.dailyPlans.forEach(plan => {
+                        plan.totalCost = plan.schedule.reduce((acc, item) => acc + (item.cost || 0), 0);
+                        plan.schedule.forEach(item => {
+                            item.icon = getLucideIcon(item.icon);
+                        });
+                    });
+                }
+
+                return parsedData;
+
+            } catch (error) {
+                console.error("Error generating itinerary:", error);
+                return {
+                    city,
+                    budget,
+                    days,
+                    dailyPlans: [{
+                        day: 1,
+                        title: "Error",
+                        summary: "We couldn’t generate an itinerary. Please try again.",
+                        schedule: [],
+                        restaurantRecommendations: []
+                    }]
+                };
+            }
+        }
+
+
+        async function downloadPdf(button) {
+            button.disabled = true;
+            button.innerHTML = `<div class="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>Generating PDF...`;
+            
+            // To ensure all Lucide icons are rendered before PDF generation
+            lucide.createIcons();
+            
+            const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+            const dayPanels = itineraryContentContainer.querySelectorAll('.day-content-panel');
+            
+            for (let i = 0; i < dayPanels.length; i++) {
+                const panel = dayPanels[i];
+                // Make sure the panel is visible before capturing
+                panel.classList.remove('hidden'); 
+                await html2canvas(panel, { scale: 2, useCORS: true }).then(canvas => {
+                    if (i > 0) pdf.addPage();
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const imgProps = pdf.getImageProperties(imgData);
+                    const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
+                });
+                // Hide the panel again if it was hidden initially (except the first one)
+                if (i !== 0 && panel.id !== `day-content-${document.querySelector('.tab-active').dataset.day}`) {
+                     panel.classList.add('hidden');
+                }
+            }
+            
+            pdf.save(`VoyAIge_Itinerary_${document.getElementById('city').value.replace(/\s/g, '_')}.pdf`);
+
+            button.disabled = false;
+            button.innerHTML = `<i data-lucide="download" class="w-5 h-5 mr-2"></i>Download PDF`;
+            lucide.createIcons(); // Re-render icons if needed
+        }
+
+        function displayItinerary(itinerary) {
+            dayTabsContainer.innerHTML = '';
+            itineraryContentContainer.innerHTML = '';
+            actionButtonsContainer.innerHTML = '';
+
+            document.getElementById('output-city').textContent = itinerary.city;
+            document.getElementById('output-days').textContent = itinerary.days;
+            document.getElementById('output-budget').textContent = itinerary.budget;
+
+            const downloadButton = document.createElement('button');
+            downloadButton.className = "bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-md shadow-md transition duration-300 flex items-center justify-center";
+            downloadButton.innerHTML = `<i data-lucide="download" class="w-5 h-5 mr-2"></i>Download PDF`;
+            downloadButton.onclick = () => downloadPdf(downloadButton);
+            actionButtonsContainer.appendChild(downloadButton);
+
+            itinerary.dailyPlans.sort((a, b) => a.day - b.day).forEach((plan, index) => {
+                const tab = document.createElement('button');
+                tab.textContent = `Day ${plan.day}`;
+                tab.className = `px-4 py-2 font-semibold transition-colors duration-300 ${index === 0 ? 'tab-active' : 'tab-inactive'}`;
+                tab.dataset.day = plan.day;
+                dayTabsContainer.appendChild(tab);
+
+                const content = document.createElement('div');
+                content.id = `day-content-${plan.day}`;
+                content.className = `day-content-panel ${index === 0 ? '' : 'hidden'}`;
+                
+                // Construct waypoints for Google Maps
+                const locations = plan.schedule.map(item => encodeURIComponent(item.activity + ', ' + itinerary.city)).join('|');
+                const mapUrl = `https://www.google.com/maps/embed/v1/directions?key=${GOOGLE_MAPS_API_KEY}&origin=${encodeURIComponent(itinerary.city)}&destination=${encodeURIComponent(itinerary.city)}&waypoints=${locations}`;
+
+                let scheduleHtml = plan.schedule.map(item => `
+                    <div class="timeline-item">
+                        <div class="timeline-icon">
+                            <div class="flex-shrink-0 bg-sky-100 text-sky-600 rounded-full h-12 w-12 flex items-center justify-center">
+                                <i data-lucide="${getLucideIcon(item.icon)}" class="w-6 h-6"></i>
+                            </div>
+                        </div>
+                        <div class="ml-6">
+                            <p class="font-semibold text-slate-500 text-sm">${item.time}</p>
+                            <h4 class="font-bold text-lg text-slate-800">${item.activity}</h4>
+                            <p class="text-slate-600 mt-1">${item.description}</p>
+                            <p class="text-sm font-medium text-green-600 mt-2">Est. Cost: $${(item.cost || 0).toFixed(2)}</p>
+                        </div>
+                    </div>
+                `).join('');
+
+                let restaurantHtml = plan.restaurantRecommendations && plan.restaurantRecommendations.length > 0 ?
+                    `
+                    <div class="mt-8 pt-8 border-t border-slate-100">
+                        <h3 class="text-2xl font-bold mb-4 flex items-center"><i data-lucide="utensils" class="w-6 h-6 mr-2 text-sky-500"></i>Restaurant Recommendations</h3>
+                        <div class="space-y-6">
+                            ${plan.restaurantRecommendations.map(resto => `
+                                <div class="bg-slate-50 p-4 rounded-lg shadow-sm">
+                                    <h4 class="font-bold text-lg text-slate-800">${resto.name} <span class="text-sm font-normal text-slate-500">(${resto.cuisine})</span></h4>
+                                    <p class="text-slate-600 mt-1">${resto.description}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    ` : '';
+
+                content.innerHTML = `
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div class="lg:col-span-2 bg-white p-8 rounded-2xl shadow-lg">
+                            <h3 class="text-2xl font-bold mb-2">${plan.title}</h3>
+                            <p class="text-slate-600 mb-8">${plan.summary}</p>
+                            <div class="timeline">
+                                ${scheduleHtml}
+                            </div>
+                            ${restaurantHtml}
+                        </div>
+                        <div class="lg:col-span-1">
+                            <div class="bg-white p-6 rounded-2xl shadow-lg sticky top-24">
+                                <h3 class="text-xl font-bold mb-4">Day ${plan.day} Map</h3>
+                                <iframe class="rounded-lg mb-4 w-full h-48" style="border:0" loading="lazy" allowfullscreen src="${mapUrl}"></iframe>
+                                <div class="bg-slate-50 p-4 rounded-lg">
+                                    <p class="font-semibold text-slate-700">Estimated Daily Cost:</p>
+                                    <p class="text-3xl font-bold text-sky-600">$${plan.totalCost.toFixed(2)}</p>
+                                    <div class="w-full bg-slate-200 rounded-full h-2.5 mt-2">
+                                        <div class="bg-green-500 h-2.5 rounded-full" style="width: ${Math.min((plan.totalCost / (itinerary.budget / itinerary.days)) * 100, 100)}%"></div>
+                                    </div>
+                                    <p class="text-xs text-slate-500 mt-1">vs. Average Daily Budget of $${(itinerary.budget / itinerary.days).toFixed(2)}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                itineraryContentContainer.appendChild(content);
+            });
+
+            const tabs = dayTabsContainer.querySelectorAll('button');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => t.classList.replace('tab-active', 'tab-inactive'));
+                    itineraryContentContainer.childNodes.forEach(c => c.classList.add('hidden'));
+                    tab.classList.replace('tab-inactive', 'tab-active');
+                    document.getElementById(`day-content-${tab.dataset.day}`).classList.remove('hidden');
+                    lucide.createIcons(); // Re-render icons for the newly visible tab content
+                });
+            });
+
+            lucide.createIcons(); // Initial rendering of icons for the first day and action buttons
+        }
+
+        function displayError(message) {
+            errorMessageContainer.innerHTML = `<div class="error-message">${message}</div>`;
+            errorMessageContainer.classList.remove('hidden');
+            itineraryOutput.classList.add('hidden'); // Ensure itinerary output is hidden on error
+        }
+    </script>
+</body>
+</html>
