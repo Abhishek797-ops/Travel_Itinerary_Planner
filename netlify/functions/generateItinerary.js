@@ -1,6 +1,6 @@
 export async function handler(event, context) {
   try {
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    const GEMINI_API_KEY = process.env.API_KEY;
     const { city, budget, days } = JSON.parse(event.body);
 
     const prompt = `
