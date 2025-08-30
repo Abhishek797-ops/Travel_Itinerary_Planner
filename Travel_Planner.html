@@ -241,8 +241,8 @@
         const errorMessageContainer = document.getElementById('error-message-container');
 
         // --- IMPORTANT: ADD YOUR API KEYS HERE ---
-        const GEMINI_API_KEY = "GEMINI_KEY"; 
-        const GOOGLE_MAPS_API_KEY = "GOOGLE_MAP_KEY"; 
+         
+        const GOOGLE_MAPS_API_KEY = "AIzaSyB3dKolPpkT2J_LAVNgvLyxlAGo2qb7ADc"; 
         // -----------------------------------------
 
         // Function to get a valid Lucide icon name, or a default
@@ -296,105 +296,36 @@
          * Generates a real itinerary using the Gemini API with a guaranteed JSON response.
          */
         async function generateRealItinerary(city, budget, days) {
-            const prompt = `
-            Create a detailed JSON response for a ${days}-day travel itinerary in ${city} with a total budget of $${budget}.
-            The response must strictly follow this schema:
-
-            {
-              "dailyPlans": [
-                {
-                  "day": number,
-                  "title": string,
-                  "summary": string,
-                  "schedule": [
-                    {
-                      "time": string,
-                      "activity": string,
-                      "description": string,
-                      "cost": number,
-                      "icon": string // Lucide icon name, e.g., "map-pin", "museum", "coffee", "shopping-bag"
-                    }
-                  ],
-                  "restaurantRecommendations": [
-                    {
-                      "name": string,
-                      "cuisine": string,
-                      "description": string
-                    }
-                  ]
-                }
-              ]
-            }
-
-            Return ONLY valid JSON, no extra text. Ensure 'cost' for activities is a number.
-            `;
-
-            const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-            const requestBody = {
-                contents: [{ parts: [{ text: prompt }] }]
-            };
-
+        
             try {
-                const response = await fetch(apiUrl, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(requestBody)
+                  const response = await fetch("/.netlify/functions/generateItinerary", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                 body: JSON.stringify({ city, budget, days })
                 });
 
-                if (!response.ok) {
-                    const errorBody = await response.json();
-                    console.error("API Error Response:", errorBody);
-                    throw new Error(`API call failed: ${response.status} - ${errorBody.error?.message || "Unknown error"}`);
-                }
+                 if (!response.ok) {
+                  throw new Error(`API call failed: ${response.status}`);
+             }
 
-                const data = await response.json();
-                const itineraryText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-                if (!itineraryText) throw new Error("No text returned from Gemini.");
-
-                let parsedData;
-                try {
-                    parsedData = JSON.parse(itineraryText);
-                } catch (e) {
-                    console.warn("Attempting to clean response and re-parse...");
-                    const cleaned = itineraryText.replace(/```json|```/g, "").trim();
-                    parsedData = JSON.parse(cleaned);
-                }
-
-                // Attach metadata
-                parsedData.city = city;
-                parsedData.budget = budget;
-                parsedData.days = days;
-
-                // Add daily total cost and ensure icons are valid
-                if (parsedData.dailyPlans) {
-                    parsedData.dailyPlans.forEach(plan => {
-                        plan.totalCost = plan.schedule.reduce((acc, item) => acc + (item.cost || 0), 0);
-                        plan.schedule.forEach(item => {
-                            item.icon = getLucideIcon(item.icon);
-                        });
-                    });
-                }
-
-                return parsedData;
-
+                return await response.json();
             } catch (error) {
-                console.error("Error generating itinerary:", error);
-                return {
-                    city,
-                    budget,
-                    days,
-                    dailyPlans: [{
-                        day: 1,
-                        title: "Error",
-                        summary: "We couldn’t generate an itinerary. Please try again.",
-                        schedule: [],
-                        restaurantRecommendations: []
-                    }]
-                };
-            }
-        }
+                  console.error("Error generating itinerary:", error);
+               return {
+      city,
+      budget,
+      days,
+      dailyPlans: [{
+        day: 1,
+        title: "Error",
+        summary: "We couldn’t generate an itinerary. Please try again.",
+        schedule: [],
+        restaurantRecommendations: []
+      }]
+    };
+  }
+}
+
 
 
         async function downloadPdf(button) {
